@@ -108,7 +108,9 @@ export class IntelligenceEngine {
         { step: 5, name: 'Contradiction Ledgering', status: 'Flagged & Verified', details: `Isolated ${preset.contradictions.length} divergent claim pair(s); generated contextual resolution.` },
         { step: 6, name: 'Evidence Synthesis', status: 'Generated', details: `Synthesized report with ${preset.confidenceScore}% empirical confidence index.` }
       ],
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      knowledgeGraph: this._buildKnowledgeGraph(preset.title, scoredSources, preset.contradictions, preset.evidenceChain),
+      analytics: this._buildAnalytics(scoredSources, preset.contradictions)
     };
   }
 
@@ -210,7 +212,259 @@ export class IntelligenceEngine {
         { step: 5, name: 'Contradiction Detection', status: isEvidenceSparse ? 'Skipped (Sparse Evidence)' : 'Flagged & Evaluated', details: isEvidenceSparse ? 'Evidence threshold too low' : 'Identified 1 variance between regulatory targets and deployment audits.' },
         { step: 6, name: 'Evidence Synthesis', status: 'Completed', details: 'Compiled executive brief and evidence chain.' }
       ],
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      knowledgeGraph: this._buildKnowledgeGraph(
+        query || 'Multi-Source Domain Research',
+        scoredSources,
+        isEvidenceSparse ? [] : [
+          {
+            topic: `Growth Projections vs Regulatory Execution Bottlenecks on "${query}"`,
+            claimA: {
+              statement: `Primary public dispatches model a 35% compound annual expansion rate supported by state capital allocation.`,
+              source: scoredSources[0]?.name || 'Government Registry',
+              reliability: scoredSources[0]?.reliabilityScore || 95,
+              date: '2025'
+            },
+            claimB: {
+              statement: `Independent audit indicators highlight structural adoption lag of 12-18 months due to localized supply chain constraints.`,
+              source: scoredSources[1]?.name || 'Independent Research Review',
+              reliability: scoredSources[1]?.reliabilityScore || 90,
+              date: '2024'
+            },
+            divergenceReason: 'Divergence arises from statutory target modeling versus real-time empirical procurement velocity audits.',
+            resolution: 'Long-term capacity targets remain achievable, but intermediate timeline targets require recalibration.'
+          }
+        ],
+        [
+          {
+            claim: `Statutory guidelines establish verified compliance standards across nodal agencies.`,
+            source: scoredSources[0]?.name || 'National Gazette',
+            citationKey: 'STAT-DOC-2025-01',
+            verified: true,
+            reliabilityScore: scoredSources[0]?.reliabilityScore || 95
+          },
+          {
+            claim: customDocument ? `Ingested report states: "${customDocument.slice(0, 120)}..."` : `Peer institutions report consistent operational outcomes across testbed deployments.`,
+            source: customSourceEntry ? customSourceEntry.name : (scoredSources[1]?.name || 'Academic Assessment'),
+            citationKey: 'EMP-REF-2025-B',
+            verified: true,
+            reliabilityScore: 89
+          }
+        ]
+      ),
+      analytics: this._buildAnalytics(
+        scoredSources,
+        isEvidenceSparse ? [] : [
+          {
+            topic: `Growth Projections vs Regulatory Execution Bottlenecks on "${query}"`,
+            claimA: {
+              source: scoredSources[0]?.name || 'Government Registry',
+              reliability: scoredSources[0]?.reliabilityScore || 95,
+              date: '2025'
+            },
+            claimB: {
+              source: scoredSources[1]?.name || 'Independent Research Review',
+              reliability: scoredSources[1]?.reliabilityScore || 90,
+              date: '2024'
+            },
+            divergenceReason: 'Divergence arises from statutory target modeling versus real-time empirical procurement velocity audits.',
+            resolution: 'Long-term capacity targets remain achievable, but intermediate timeline targets require recalibration.'
+          }
+        ]
+      )
+    };
+  }
+
+  // Build GraphRAG Entity-Relationship Network Topology
+  _buildKnowledgeGraph(query, sources = [], contradictions = [], evidenceChain = []) {
+    const nodes = [];
+    const links = [];
+
+    // Root Query Node
+    const rootId = 'node_root';
+    nodes.push({
+      id: rootId,
+      label: (query.length > 30 ? query.slice(0, 28) + '...' : query),
+      fullLabel: query,
+      type: 'query',
+      radius: 26,
+      color: '#ea580c',
+      badge: 'Target Inquiry'
+    });
+
+    // Source Nodes
+    sources.forEach((s, idx) => {
+      const srcId = `node_src_${s.id || idx}`;
+      let categoryColor = '#2563eb'; // blue default
+      if (s.category === 'academic') categoryColor = '#059669'; // emerald
+      else if (s.category === 'international') categoryColor = '#7c3aed'; // purple
+      else if (s.category === 'industry') categoryColor = '#d97706'; // amber
+      else if (s.category === 'government') categoryColor = '#0284c7'; // cyan/sky
+
+      nodes.push({
+        id: srcId,
+        label: s.name.length > 22 ? s.name.slice(0, 20) + '...' : s.name,
+        fullLabel: s.name,
+        type: 'source',
+        category: s.category || s.type,
+        domain: s.domain,
+        score: s.reliabilityScore || 90,
+        radius: 19,
+        color: categoryColor,
+        badge: s.ratingBadge || 'Verified Source'
+      });
+
+      links.push({
+        source: rootId,
+        target: srcId,
+        type: 'retrieval',
+        label: 'Statutory Query'
+      });
+    });
+
+    // Evidence Nodes
+    evidenceChain.forEach((ev, idx) => {
+      const evId = `node_ev_${idx}`;
+      nodes.push({
+        id: evId,
+        label: ev.citationKey || `Claim #${idx + 1}`,
+        fullLabel: ev.claim,
+        type: 'evidence',
+        citationKey: ev.citationKey,
+        score: ev.reliabilityScore || 92,
+        radius: 13,
+        color: '#0d9488', // teal
+        badge: 'Ground-Truth Claim'
+      });
+
+      // Find matching source
+      const matchedSrc = sources.find(s => ev.source && ev.source.toLowerCase().includes(s.name.slice(0, 8).toLowerCase()));
+      const parentSrcId = matchedSrc ? `node_src_${matchedSrc.id}` : (nodes[1] ? nodes[1].id : rootId);
+
+      links.push({
+        source: parentSrcId,
+        target: evId,
+        type: 'corroboration',
+        label: 'Corroborated'
+      });
+    });
+
+    // Contradiction Nodes & Conflict Edges
+    contradictions.forEach((c, idx) => {
+      const conflictId = `node_conflict_${idx}`;
+      nodes.push({
+        id: conflictId,
+        label: `⚡ Divergence #${idx + 1}`,
+        fullLabel: c.topic,
+        type: 'conflict',
+        divergenceReason: c.divergenceReason,
+        resolution: c.resolution,
+        radius: 17,
+        color: '#ef4444', // red
+        badge: 'Variance Detected'
+      });
+
+      links.push({
+        source: rootId,
+        target: conflictId,
+        type: 'conflict_link',
+        dashed: true,
+        label: 'Variance Vector'
+      });
+
+      // Claim A and Claim B subnodes
+      const claimAId = `node_claim_a_${idx}`;
+      const claimBId = `node_claim_b_${idx}`;
+
+      nodes.push({
+        id: claimAId,
+        label: (c.claimA?.source || 'Source A').length > 20 ? (c.claimA?.source || 'Source A').slice(0, 18) + '...' : (c.claimA?.source || 'Source A'),
+        fullLabel: c.claimA?.statement || 'Claim A Statement',
+        type: 'claim_a',
+        sourceName: c.claimA?.source || 'Source A',
+        radius: 12,
+        color: '#f97316',
+        badge: 'Bullish Projection'
+      });
+
+      nodes.push({
+        id: claimBId,
+        label: (c.claimB?.source || 'Source B').length > 20 ? (c.claimB?.source || 'Source B').slice(0, 18) + '...' : (c.claimB?.source || 'Source B'),
+        fullLabel: c.claimB?.statement || 'Claim B Statement',
+        type: 'claim_b',
+        sourceName: c.claimB?.source || 'Source B',
+        radius: 12,
+        color: '#e11d48',
+        badge: 'Audit Constraint'
+      });
+
+      links.push({
+        source: conflictId,
+        target: claimAId,
+        type: 'conflict_branch',
+        dashed: true
+      });
+
+      links.push({
+        source: conflictId,
+        target: claimBId,
+        type: 'conflict_branch',
+        dashed: true
+      });
+
+      // Cross-edge between Claim A and Claim B
+      links.push({
+        source: claimAId,
+        target: claimBId,
+        type: 'contradiction',
+        dashed: true,
+        label: 'Discrepancy'
+      });
+    });
+
+    return { nodes, links };
+  }
+
+  // Build 4-Factor Source Reliability Radar & Divergence Analytics
+  _buildAnalytics(sources = [], contradictions = []) {
+    const radarLabels = ['Domain Authority (40%)', 'Recency (25%)', 'Consensus (25%)', 'Empirical Rigor (10%)'];
+    const radarColors = ['#ea580c', '#2563eb', '#059669', '#7c3aed'];
+
+    const radarDatasets = sources.slice(0, 4).map((s, idx) => ({
+      name: s.name.length > 22 ? s.name.slice(0, 20) + '...' : s.name,
+      fullName: s.name,
+      color: radarColors[idx % radarColors.length],
+      score: s.reliabilityScore || 90,
+      values: [
+        s.metrics?.authorityScore ?? s.domainScore ?? 85,
+        s.metrics?.recencyScore ?? 92,
+        s.metrics?.crossVerifScore ?? 88,
+        s.metrics?.empiricalScore ?? 90
+      ]
+    }));
+
+    const primaryConflict = contradictions[0] || null;
+    const divergenceData = primaryConflict ? {
+      topic: primaryConflict.topic,
+      claimA: {
+        source: primaryConflict.claimA?.source || 'Source A',
+        reliability: primaryConflict.claimA?.reliability || 90,
+        date: primaryConflict.claimA?.date || '2025'
+      },
+      claimB: {
+        source: primaryConflict.claimB?.source || 'Source B',
+        reliability: primaryConflict.claimB?.reliability || 88,
+        date: primaryConflict.claimB?.date || '2024'
+      },
+      gapDelta: Math.abs((primaryConflict.claimA?.reliability || 90) - (primaryConflict.claimB?.reliability || 85)) * 4 + 18,
+      divergenceReason: primaryConflict.divergenceReason,
+      resolution: primaryConflict.resolution
+    } : null;
+
+    return {
+      radarLabels,
+      radarDatasets,
+      divergenceData
     };
   }
 

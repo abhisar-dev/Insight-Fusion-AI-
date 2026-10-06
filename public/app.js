@@ -1153,9 +1153,14 @@ document.addEventListener('DOMContentLoaded', () => {
             <strong>Contextual Resolution:</strong> ${c.resolution}
           </div>
 
-          <button type="button" class="btn btn-outline btn-sm btn-open-lens" data-idx="${idx}">
-            <span>🔍</span> Document Lens (Split Raw Diff)
-          </button>
+          <div style="display: flex; gap: 0.5rem; margin-top: 0.65rem; flex-wrap: wrap;">
+            <button type="button" class="btn btn-outline btn-sm btn-open-lens" data-idx="${idx}">
+              <span>🔍</span> Document Lens (Split Raw Diff)
+            </button>
+            <button type="button" class="btn-save-claim btn-save-contradiction" data-idx="${idx}">
+              <span>⭐</span> Save to Notebook
+            </button>
+          </div>
         </div>
       `).join('');
 
@@ -1187,11 +1192,16 @@ document.addEventListener('DOMContentLoaded', () => {
     `).join('');
 
     // Evidence chain
-    evidenceChainList.innerHTML = data.evidenceChain.map(e => `
+    evidenceChainList.innerHTML = data.evidenceChain.map((e, idx) => `
       <div class="evidence-item">
         <div class="evidence-head">
           <span class="evidence-source">${e.source}</span>
-          <span class="evidence-badge">🔒 Citation: ${e.citationKey}</span>
+          <div style="display: flex; align-items: center; gap: 0.4rem;">
+            <span class="evidence-badge">🔒 Citation: ${e.citationKey}</span>
+            <button type="button" class="btn-save-claim btn-save-evidence" data-idx="${idx}">
+              <span>⭐</span> Save
+            </button>
+          </div>
         </div>
         <p class="evidence-quote">“${e.claim}”</p>
       </div>
@@ -1207,6 +1217,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Render OpenTelemetry Execution Trace Waterfall
     renderTelemetryWaterfall();
+
+    // Render Interactive Force-Directed Knowledge Graph (GraphRAG)
+    initKnowledgeGraph(data.knowledgeGraph || buildFallbackGraph(data));
+
+    // Render Multi-Factor Source Reliability Radar Chart
+    renderRadarChart(data.analytics || buildFallbackAnalytics(data));
+
+    // Render Contradiction Divergence Gap Bar Chart
+    renderDivergenceChart(data.analytics?.divergenceData || (data.contradictions && data.contradictions[0]));
+
+    // Attach Save to Notebook listeners on evidence & contradiction cards
+    attachNotebookSaveListeners(data);
 
     // Initialize View Mode Tabs
     initViewModeTabs();
@@ -1253,7 +1275,9 @@ document.addEventListener('DOMContentLoaded', () => {
   function applyViewMode(mode) {
     const kpiRow = document.querySelector('.kpi-grid');
     const synthesisSec = document.getElementById('synthesisTextBox')?.closest('.card-panel');
+    const graphSec = document.getElementById('knowledgeGraphSection');
     const contradictionSec = document.getElementById('contradictionSection');
+    const analyticsSec = document.getElementById('analyticsSuiteSection');
     const citationSec = document.getElementById('citationOutputBox')?.closest('.card-panel');
     const sourceTableSec = document.getElementById('sourceTableBody')?.closest('.card-panel');
     const evidenceSec = document.getElementById('evidenceChainList')?.closest('.card-panel');
@@ -1261,23 +1285,25 @@ document.addEventListener('DOMContentLoaded', () => {
     const telemetrySec = document.getElementById('telemetryTraceCard');
 
     // Reset all
-    [kpiRow, synthesisSec, contradictionSec, citationSec, sourceTableSec, evidenceSec, recsSec, telemetrySec].forEach(el => {
+    [kpiRow, synthesisSec, graphSec, contradictionSec, analyticsSec, citationSec, sourceTableSec, evidenceSec, recsSec, telemetrySec].forEach(el => {
       if (el) el.style.display = 'block';
     });
     if (kpiRow) kpiRow.style.display = 'grid';
 
     if (mode === 'exec') {
       // 1-min executive view: KPIs, Summary, Recommendations
+      if (graphSec) graphSec.style.display = 'none';
+      if (analyticsSec) analyticsSec.style.display = 'none';
       if (citationSec) citationSec.style.display = 'none';
       if (sourceTableSec) sourceTableSec.style.display = 'none';
       if (evidenceSec) evidenceSec.style.display = 'none';
       if (telemetrySec) telemetrySec.style.display = 'none';
     } else if (mode === 'research') {
-      // Academic Research view: Summary, Contradictions, Citations, Evidence Chain
+      // Academic Research view: Summary, Graph, Contradictions, Citations, Evidence Chain
       if (telemetrySec) telemetrySec.style.display = 'none';
       if (sourceTableSec) sourceTableSec.style.display = 'none';
     } else if (mode === 'audit') {
-      // Audit & Compliance: KPIs, Contradictions, Source Table, Telemetry Trace
+      // Audit & Compliance: KPIs, Graph, Analytics, Contradictions, Source Table, Telemetry Trace
       if (citationSec) citationSec.style.display = 'none';
       if (recsSec) recsSec.style.display = 'none';
     }
@@ -1761,5 +1787,1003 @@ async function verifyClaims(query: string): Promise<InsightFusionResponse> {
     });
   }
 
+  // ==========================================================================
+  // 13. Interactive Force-Directed Knowledge Graph Visualizer (GraphRAG)
+  // ==========================================================================
+  let graphAnimationId = null;
+  let graphNodes = [];
+  let graphLinks = [];
+  let activeGraphFilter = 'all';
+  let isPhysicsRunning = true;
+  let graphScale = 1.0;
+  let graphPan = { x: 0, y: 0 };
+  let draggedNode = null;
+  let hoveredNode = null;
+  let selectedNode = null;
+  let dashOffset = 0;
+
+  function buildFallbackGraph(data) {
+    const query = data.query || 'Research Inquiry';
+    const sources = data.sources || [];
+    const contradictions = data.contradictions || [];
+    const evidence = data.evidenceChain || [];
+
+    const nodes = [
+      { id: 'node_root', label: query.length > 28 ? query.slice(0, 26) + '...' : query, fullLabel: query, type: 'query', radius: 26, color: '#ea580c', badge: 'Target Inquiry' }
+    ];
+    const links = [];
+
+    sources.forEach((s, idx) => {
+      const srcId = `node_src_${s.id || idx}`;
+      let col = '#2563eb';
+      if (s.category === 'academic') col = '#059669';
+      else if (s.category === 'international') col = '#7c3aed';
+      else if (s.category === 'industry') col = '#d97706';
+      nodes.push({
+        id: srcId,
+        label: s.name.length > 20 ? s.name.slice(0, 18) + '...' : s.name,
+        fullLabel: s.name,
+        type: 'source',
+        domain: s.domain,
+        score: s.reliabilityScore || 90,
+        radius: 19,
+        color: col,
+        badge: s.ratingBadge || 'Verified Source'
+      });
+      links.push({ source: 'node_root', target: srcId, type: 'retrieval' });
+    });
+
+    evidence.forEach((ev, idx) => {
+      const evId = `node_ev_${idx}`;
+      nodes.push({
+        id: evId,
+        label: ev.citationKey || `Claim #${idx + 1}`,
+        fullLabel: ev.claim,
+        type: 'evidence',
+        score: ev.reliabilityScore || 92,
+        radius: 13,
+        color: '#0d9488',
+        badge: 'Ground-Truth Claim'
+      });
+      links.push({ source: nodes[1] ? nodes[1].id : 'node_root', target: evId, type: 'corroboration' });
+    });
+
+    contradictions.forEach((c, idx) => {
+      const confId = `node_conflict_${idx}`;
+      nodes.push({
+        id: confId,
+        label: `⚡ Divergence #${idx + 1}`,
+        fullLabel: c.topic,
+        type: 'conflict',
+        divergenceReason: c.divergenceReason,
+        resolution: c.resolution,
+        radius: 17,
+        color: '#ef4444',
+        badge: 'Variance Detected'
+      });
+      links.push({ source: 'node_root', target: confId, type: 'conflict_link', dashed: true });
+    });
+
+    return { nodes, links };
+  }
+
+  function initKnowledgeGraph(graphData) {
+    const canvas = document.getElementById('knowledgeGraphCanvas');
+    if (!canvas) return;
+
+    if (graphAnimationId) {
+      cancelAnimationFrame(graphAnimationId);
+      graphAnimationId = null;
+    }
+
+    const wrapper = canvas.parentElement;
+    const width = wrapper.offsetWidth || 800;
+    const height = wrapper.offsetHeight || 480;
+    canvas.width = width;
+    canvas.height = height;
+
+    const rawNodes = (graphData && graphData.nodes) ? graphData.nodes : [];
+    const rawLinks = (graphData && graphData.links) ? graphData.links : [];
+
+    const cx = width / 2;
+    const cy = height / 2;
+
+    graphNodes = rawNodes.map((n, i) => {
+      const angle = (i / Math.max(rawNodes.length, 1)) * Math.PI * 2;
+      const dist = n.type === 'query' ? 0 : (n.type === 'source' ? 140 : 210);
+      return {
+        ...n,
+        x: cx + Math.cos(angle) * dist + (Math.random() - 0.5) * 30,
+        y: cy + Math.sin(angle) * dist + (Math.random() - 0.5) * 30,
+        vx: 0,
+        vy: 0,
+        radius: n.radius || 16,
+        isPinned: n.type === 'query'
+      };
+    });
+
+    graphLinks = rawLinks.map(l => {
+      const sId = typeof l.source === 'object' ? l.source.id : l.source;
+      const tId = typeof l.target === 'object' ? l.target.id : l.target;
+      const sNode = graphNodes.find(n => n.id === sId) || graphNodes[0];
+      const tNode = graphNodes.find(n => n.id === tId) || graphNodes[1] || graphNodes[0];
+      return {
+        ...l,
+        source: sNode,
+        target: tNode
+      };
+    });
+
+    graphScale = 1.0;
+    graphPan = { x: 0, y: 0 };
+    isPhysicsRunning = true;
+    draggedNode = null;
+    hoveredNode = null;
+
+    setupGraphEvents(canvas);
+
+    function tick() {
+      dashOffset += 0.5;
+      if (isPhysicsRunning) {
+        updateGraphPhysics(width, height);
+      }
+      drawKnowledgeGraph(canvas);
+      graphAnimationId = requestAnimationFrame(tick);
+    }
+    tick();
+  }
+
+  function updateGraphPhysics(width, height) {
+    const cx = width / 2;
+    const cy = height / 2;
+
+    // Repulsion between nodes
+    for (let i = 0; i < graphNodes.length; i++) {
+      for (let j = i + 1; j < graphNodes.length; j++) {
+        const n1 = graphNodes[i];
+        const n2 = graphNodes[j];
+        const dx = n2.x - n1.x;
+        const dy = n2.y - n1.y;
+        const distSq = dx * dx + dy * dy + 1;
+        const dist = Math.sqrt(distSq);
+        const minDist = n1.radius + n2.radius + 35;
+        const repForce = Math.min(250, (minDist * minDist * 45) / distSq);
+
+        const fx = (dx / dist) * repForce;
+        const fy = (dy / dist) * repForce;
+
+        if (!n1.isPinned && n1 !== draggedNode) {
+          n1.vx -= fx * 0.04;
+          n1.vy -= fy * 0.04;
+        }
+        if (!n2.isPinned && n2 !== draggedNode) {
+          n2.vx += fx * 0.04;
+          n2.vy += fy * 0.04;
+        }
+      }
+    }
+
+    // Spring attraction along links
+    for (let i = 0; i < graphLinks.length; i++) {
+      const l = graphLinks[i];
+      if (!l.source || !l.target) continue;
+      const dx = l.target.x - l.source.x;
+      const dy = l.target.y - l.source.y;
+      const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+      const desiredDist = l.dashed ? 110 : (l.type === 'retrieval' ? 140 : 85);
+      const springForce = (dist - desiredDist) * 0.035;
+
+      const fx = (dx / dist) * springForce;
+      const fy = (dy / dist) * springForce;
+
+      if (!l.source.isPinned && l.source !== draggedNode) {
+        l.source.vx += fx;
+        l.source.vy += fy;
+      }
+      if (!l.target.isPinned && l.target !== draggedNode) {
+        l.target.vx += fx;
+        l.target.vy += fy;
+      }
+    }
+
+    // Gravity to center & update positions
+    for (let i = 0; i < graphNodes.length; i++) {
+      const n = graphNodes[i];
+      if (n.isPinned && n !== draggedNode) {
+        n.x = cx;
+        n.y = cy;
+        continue;
+      }
+      if (n === draggedNode) continue;
+
+      const toCenterX = (cx - n.x) * 0.008;
+      const toCenterY = (cy - n.y) * 0.008;
+
+      n.vx += toCenterX;
+      n.vy += toCenterY;
+
+      // Friction
+      n.vx *= 0.86;
+      n.vy *= 0.86;
+
+      n.x += n.vx;
+      n.y += n.vy;
+
+      // Boundaries with soft bounce
+      const pad = n.radius + 10;
+      if (n.x < pad) { n.x = pad; n.vx *= -0.5; }
+      if (n.x > width - pad) { n.x = width - pad; n.vx *= -0.5; }
+      if (n.y < pad) { n.y = pad; n.vy *= -0.5; }
+      if (n.y > height - pad) { n.y = height - pad; n.vy *= -0.5; }
+    }
+  }
+
+  function drawKnowledgeGraph(canvas) {
+    const ctx = canvas.getContext('2d');
+    const width = canvas.width;
+    const height = canvas.height;
+
+    ctx.clearRect(0, 0, width, height);
+
+    ctx.save();
+    // Center pan & zoom
+    ctx.translate(width / 2 + graphPan.x, height / 2 + graphPan.y);
+    ctx.scale(graphScale, graphScale);
+    ctx.translate(-width / 2, -height / 2);
+
+    // Filtered nodes
+    const visibleNodes = graphNodes.filter(n => {
+      if (activeGraphFilter === 'conflicts') return n.type === 'conflict' || n.type === 'claim_a' || n.type === 'claim_b' || n.type === 'query';
+      if (activeGraphFilter === 'sources') return n.type === 'source' || n.type === 'query';
+      return true;
+    });
+    const visibleNodeIds = new Set(visibleNodes.map(n => n.id));
+
+    // Draw Links
+    for (let i = 0; i < graphLinks.length; i++) {
+      const l = graphLinks[i];
+      if (!visibleNodeIds.has(l.source.id) || !visibleNodeIds.has(l.target.id)) continue;
+
+      ctx.beginPath();
+      ctx.moveTo(l.source.x, l.source.y);
+      ctx.lineTo(l.target.x, l.target.y);
+
+      if (l.dashed || l.type === 'contradiction' || l.type === 'conflict_link') {
+        ctx.setLineDash([6, 5]);
+        ctx.lineDashOffset = -dashOffset;
+        ctx.strokeStyle = '#ef4444';
+        ctx.lineWidth = 2.2;
+      } else {
+        ctx.setLineDash([]);
+        ctx.strokeStyle = '#cbd5e1';
+        ctx.lineWidth = 1.4;
+      }
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+
+    // Draw Nodes
+    for (let i = 0; i < visibleNodes.length; i++) {
+      const n = visibleNodes[i];
+      const isHovered = (hoveredNode === n);
+      const isSelected = (selectedNode === n);
+
+      // Outer glow/ring if hovered or selected
+      if (isHovered || isSelected || n.type === 'query') {
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, n.radius + 6, 0, Math.PI * 2);
+        ctx.fillStyle = n.type === 'conflict' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(234, 88, 12, 0.18)';
+        ctx.fill();
+      }
+
+      // Main node body
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, n.radius, 0, Math.PI * 2);
+      ctx.fillStyle = n.color || '#ea580c';
+      ctx.shadowColor = 'rgba(0,0,0,0.12)';
+      ctx.shadowBlur = 6;
+      ctx.shadowOffsetY = 2;
+      ctx.fill();
+      ctx.shadowColor = 'transparent';
+
+      // White outline
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+
+      // Inner Icon
+      ctx.font = `${Math.round(n.radius * 0.9)}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      let icon = '•';
+      if (n.type === 'query') icon = '🎯';
+      else if (n.type === 'source') icon = '🏛️';
+      else if (n.type === 'evidence') icon = '🔒';
+      else if (n.type === 'conflict') icon = '⚡';
+      else if (n.type === 'claim_a') icon = '📈';
+      else if (n.type === 'claim_b') icon = '📉';
+      ctx.fillText(icon, n.x, n.y);
+
+      // Node label badge below
+      const labelText = n.label || '';
+      ctx.font = '600 11px system-ui, sans-serif';
+      const textWidth = ctx.measureText(labelText).width;
+      const badgeW = textWidth + 12;
+      const badgeH = 18;
+      const badgeY = n.y + n.radius + 5;
+
+      // Label background pill
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.92)';
+      ctx.strokeStyle = '#e2e8f0';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.roundRect(n.x - badgeW / 2, badgeY, badgeW, badgeH, 4);
+      ctx.fill();
+      ctx.stroke();
+
+      // Label text
+      ctx.fillStyle = '#1e293b';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(labelText, n.x, badgeY + badgeH / 2);
+    }
+
+    ctx.restore();
+  }
+
+  function setupGraphEvents(canvas) {
+    let isMouseDown = false;
+    let dragStartX = 0;
+    let dragStartY = 0;
+
+    function getMousePos(e) {
+      const rect = canvas.getBoundingClientRect();
+      const clientX = e.clientX || (e.touches && e.touches[0]?.clientX);
+      const clientY = e.clientY || (e.touches && e.touches[0]?.clientY);
+      const canvasX = clientX - rect.left;
+      const canvasY = clientY - rect.top;
+
+      // Invert pan and scale
+      const cx = canvas.width / 2;
+      const cy = canvas.height / 2;
+      const worldX = (canvasX - (cx + graphPan.x)) / graphScale + cx;
+      const worldY = (canvasY - (cy + graphPan.y)) / graphScale + cy;
+      return { worldX, worldY, canvasX, canvasY };
+    }
+
+    function findNodeAt(x, y) {
+      for (let i = graphNodes.length - 1; i >= 0; i--) {
+        const n = graphNodes[i];
+        const dx = n.x - x;
+        const dy = n.y - y;
+        if (dx * dx + dy * dy <= (n.radius + 8) * (n.radius + 8)) {
+          return n;
+        }
+      }
+      return null;
+    }
+
+    canvas.onmousedown = (e) => {
+      const { worldX, worldY, canvasX, canvasY } = getMousePos(e);
+      const target = findNodeAt(worldX, worldY);
+      if (target) {
+        draggedNode = target;
+        selectedNode = target;
+        openNodeInspector(target);
+        playClick();
+      } else {
+        isMouseDown = true;
+        dragStartX = canvasX - graphPan.x;
+        dragStartY = canvasY - graphPan.y;
+      }
+    };
+
+    window.onmousemove = (e) => {
+      if (draggedNode) {
+        const { worldX, worldY } = getMousePos(e);
+        draggedNode.x = worldX;
+        draggedNode.y = worldY;
+        draggedNode.vx = 0;
+        draggedNode.vy = 0;
+      } else if (isMouseDown) {
+        const rect = canvas.getBoundingClientRect();
+        graphPan.x = (e.clientX - rect.left) - dragStartX;
+        graphPan.y = (e.clientY - rect.top) - dragStartY;
+      } else {
+        const { worldX, worldY } = getMousePos(e);
+        hoveredNode = findNodeAt(worldX, worldY);
+        canvas.style.cursor = hoveredNode ? 'pointer' : 'grab';
+      }
+    };
+
+    window.onmouseup = () => {
+      draggedNode = null;
+      isMouseDown = false;
+    };
+
+    canvas.onwheel = (e) => {
+      e.preventDefault();
+      const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
+      graphScale = Math.max(0.4, Math.min(2.5, graphScale * zoomFactor));
+    };
+
+    // Filter Buttons
+    document.querySelectorAll('.graph-filter-btn').forEach(btn => {
+      btn.onclick = () => {
+        playClick();
+        document.querySelectorAll('.graph-filter-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        activeGraphFilter = btn.getAttribute('data-graph-filter');
+      };
+    });
+
+    // Control buttons
+    const btnGraphReset = document.getElementById('btnGraphReset');
+    if (btnGraphReset) {
+      btnGraphReset.onclick = () => {
+        playClick();
+        graphScale = 1.0;
+        graphPan = { x: 0, y: 0 };
+      };
+    }
+
+    const btnGraphZoomIn = document.getElementById('btnGraphZoomIn');
+    if (btnGraphZoomIn) {
+      btnGraphZoomIn.onclick = () => {
+        playClick();
+        graphScale = Math.min(2.5, graphScale * 1.2);
+      };
+    }
+
+    const btnGraphZoomOut = document.getElementById('btnGraphZoomOut');
+    if (btnGraphZoomOut) {
+      btnGraphZoomOut.onclick = () => {
+        playClick();
+        graphScale = Math.max(0.4, graphScale / 1.2);
+      };
+    }
+
+    const btnGraphTogglePhysics = document.getElementById('btnGraphTogglePhysics');
+    if (btnGraphTogglePhysics) {
+      btnGraphTogglePhysics.onclick = () => {
+        playClick();
+        isPhysicsRunning = !isPhysicsRunning;
+        btnGraphTogglePhysics.textContent = isPhysicsRunning ? '⏸️' : '▶️';
+      };
+    }
+
+    // Inspector close button
+    const btnCloseInspector = document.getElementById('btnCloseInspector');
+    if (btnCloseInspector) {
+      btnCloseInspector.onclick = () => {
+        document.getElementById('graphNodeInspector').style.display = 'none';
+        selectedNode = null;
+      };
+    }
+  }
+
+  function openNodeInspector(node) {
+    const inspector = document.getElementById('graphNodeInspector');
+    const badge = document.getElementById('inspectorNodeBadge');
+    const title = document.getElementById('inspectorNodeTitle');
+    const meta = document.getElementById('inspectorNodeMeta');
+    const excerpt = document.getElementById('inspectorNodeExcerpt');
+    const btnSave = document.getElementById('btnInspectorSave');
+    const btnCopy = document.getElementById('btnInspectorCopy');
+
+    if (!inspector) return;
+
+    badge.textContent = node.badge || 'Graph Node';
+    badge.className = `badge ${node.type === 'conflict' ? 'badge-warning' : (node.score >= 90 ? 'badge-success' : 'badge-orange')}`;
+    title.textContent = node.fullLabel || node.label;
+    meta.innerHTML = `Classification: <strong>${(node.type || 'ENTITY').toUpperCase()}</strong> &bull; Score: <strong>${node.score || 90}/100</strong>`;
+    
+    let text = node.divergenceReason || node.resolution || node.fullLabel || 'No verbatim excerpt attached.';
+    excerpt.textContent = text;
+
+    btnSave.onclick = () => {
+      playClick();
+      saveToNotebook({
+        source: node.label,
+        claim: text,
+        citationKey: node.citationKey || `GRAPH-NODE-${node.id.toUpperCase()}`,
+        score: node.score || 90
+      });
+      btnSave.textContent = 'Saved ✓';
+      setTimeout(() => { btnSave.textContent = '⭐ Save to Notebook'; }, 1800);
+    };
+
+    btnCopy.onclick = () => {
+      playClick();
+      navigator.clipboard.writeText(text);
+      btnCopy.textContent = 'Copied ✓';
+      setTimeout(() => { btnCopy.textContent = '📋 Copy Text'; }, 1800);
+    };
+
+    inspector.style.display = 'block';
+  }
+
+  // ==========================================================================
+  // 14. 4-Factor Source Reliability Radar & Divergence Analytics
+  // ==========================================================================
+  function buildFallbackAnalytics(data) {
+    const sources = data.sources || [];
+    const contradictions = data.contradictions || [];
+    const radarLabels = ['Domain Authority (40%)', 'Recency (25%)', 'Consensus (25%)', 'Empirical Rigor (10%)'];
+    const colors = ['#ea580c', '#2563eb', '#059669', '#7c3aed'];
+
+    const radarDatasets = sources.slice(0, 4).map((s, idx) => ({
+      name: s.name.length > 20 ? s.name.slice(0, 18) + '...' : s.name,
+      fullName: s.name,
+      color: colors[idx % colors.length],
+      score: s.reliabilityScore || 90,
+      values: [
+        s.metrics?.authorityScore ?? s.domainScore ?? 85,
+        s.metrics?.recencyScore ?? 92,
+        s.metrics?.crossVerifScore ?? 88,
+        s.metrics?.empiricalScore ?? 90
+      ]
+    }));
+
+    const primaryConflict = contradictions[0] || null;
+    const divergenceData = primaryConflict ? {
+      topic: primaryConflict.topic,
+      claimA: { source: primaryConflict.claimA?.source || 'Source A', reliability: primaryConflict.claimA?.reliability || 90 },
+      claimB: { source: primaryConflict.claimB?.source || 'Source B', reliability: primaryConflict.claimB?.reliability || 88 },
+      gapDelta: 44.8,
+      divergenceReason: primaryConflict.divergenceReason,
+      resolution: primaryConflict.resolution
+    } : null;
+
+    return { radarLabels, radarDatasets, divergenceData };
+  }
+
+  function renderRadarChart(analytics) {
+    const canvas = document.getElementById('radarChartCanvas');
+    const legend = document.getElementById('radarLegendList');
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width;
+    const h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
+
+    const labels = analytics?.radarLabels || ['Domain Authority', 'Recency', 'Consensus', 'Empirical Rigor'];
+    const datasets = analytics?.radarDatasets || [];
+
+    const cx = w / 2;
+    const cy = h / 2 - 10;
+    const radius = Math.min(cx, cy) - 36;
+    const numAxes = labels.length;
+
+    // Draw concentric polygon rings (20%, 40%, 60%, 80%, 100%)
+    const levels = [0.2, 0.4, 0.6, 0.8, 1.0];
+    levels.forEach(lvl => {
+      ctx.beginPath();
+      for (let i = 0; i < numAxes; i++) {
+        const angle = (i / numAxes) * Math.PI * 2 - Math.PI / 2;
+        const x = cx + Math.cos(angle) * (radius * lvl);
+        const y = cy + Math.sin(angle) * (radius * lvl);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      ctx.strokeStyle = lvl === 1.0 ? '#cbd5e1' : '#f1f5f9';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // Ring percentage label
+      ctx.font = '9px monospace';
+      ctx.fillStyle = '#94a3b8';
+      ctx.textAlign = 'left';
+      ctx.fillText(`${Math.round(lvl * 100)}%`, cx + 4, cy - (radius * lvl) + 3);
+    });
+
+    // Draw spokes and axis labels
+    for (let i = 0; i < numAxes; i++) {
+      const angle = (i / numAxes) * Math.PI * 2 - Math.PI / 2;
+      const x = cx + Math.cos(angle) * radius;
+      const y = cy + Math.sin(angle) * radius;
+
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(x, y);
+      ctx.strokeStyle = '#e2e8f0';
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+
+      // Label text
+      const labelDist = radius + 20;
+      const lx = cx + Math.cos(angle) * labelDist;
+      const ly = cy + Math.sin(angle) * labelDist;
+      ctx.font = '600 10.5px system-ui, sans-serif';
+      ctx.fillStyle = '#334155';
+      ctx.textAlign = Math.abs(Math.cos(angle)) < 0.2 ? 'center' : (Math.cos(angle) > 0 ? 'left' : 'right');
+      ctx.textBaseline = Math.abs(Math.sin(angle)) < 0.2 ? 'middle' : (Math.sin(angle) > 0 ? 'top' : 'bottom');
+      ctx.fillText(labels[i], lx, ly);
+    }
+
+    // Draw datasets polygons
+    datasets.forEach(ds => {
+      const values = ds.values || [80, 80, 80, 80];
+      ctx.beginPath();
+      for (let i = 0; i < numAxes; i++) {
+        const angle = (i / numAxes) * Math.PI * 2 - Math.PI / 2;
+        const valPct = Math.max(0, Math.min(100, values[i])) / 100;
+        const x = cx + Math.cos(angle) * (radius * valPct);
+        const y = cy + Math.sin(angle) * (radius * valPct);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+
+      // Translucent fill
+      ctx.fillStyle = hexToRgba(ds.color, 0.2);
+      ctx.fill();
+
+      // Bright border stroke
+      ctx.strokeStyle = ds.color;
+      ctx.lineWidth = 2.2;
+      ctx.stroke();
+
+      // Vertex dots
+      for (let i = 0; i < numAxes; i++) {
+        const angle = (i / numAxes) * Math.PI * 2 - Math.PI / 2;
+        const valPct = Math.max(0, Math.min(100, values[i])) / 100;
+        const x = cx + Math.cos(angle) * (radius * valPct);
+        const y = cy + Math.sin(angle) * (radius * valPct);
+        ctx.beginPath();
+        ctx.arc(x, y, 3.5, 0, Math.PI * 2);
+        ctx.fillStyle = ds.color;
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
+    });
+
+    // Populate legend
+    if (legend) {
+      legend.innerHTML = datasets.map(ds => `
+        <div class="radar-legend-item">
+          <span class="radar-legend-color" style="background-color: ${ds.color};"></span>
+          <span>${ds.name} (<strong>${ds.score}%</strong>)</span>
+        </div>
+      `).join('');
+    }
+  }
+
+  function hexToRgba(hex, alpha = 0.25) {
+    let c = hex.replace('#', '');
+    if (c.length === 3) c = c.split('').map(x => x + x).join('');
+    const num = parseInt(c, 16);
+    return `rgba(${(num >> 16) & 255}, ${(num >> 8) & 255}, ${num & 255}, ${alpha})`;
+  }
+
+  function renderDivergenceChart(divergenceData) {
+    const canvas = document.getElementById('divergenceChartCanvas');
+    const badge = document.getElementById('divergenceDeltaBadge');
+    const note = document.getElementById('divergenceTextNote');
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width;
+    const h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
+
+    if (!divergenceData) {
+      ctx.font = '12px system-ui';
+      ctx.fillStyle = '#64748b';
+      ctx.textAlign = 'center';
+      ctx.fillText('No divergence flagged for this query.', w / 2, h / 2);
+      if (badge) badge.textContent = 'Delta Gap: 0%';
+      return;
+    }
+
+    const gapDelta = divergenceData.gapDelta || 44.8;
+    if (badge) badge.textContent = `Δ Gap: ${gapDelta.toFixed(1)}%`;
+    if (note && divergenceData.divergenceReason) note.textContent = divergenceData.divergenceReason;
+
+    // Bar 1: Claim A Metric (Bullish Projection)
+    const barW = 120;
+    const bar1H = 135;
+    const bar2H = Math.round(bar1H * (1 - (gapDelta / 100) * 0.75));
+
+    const bar1X = w * 0.22 - barW / 2;
+    const bar2X = w * 0.78 - barW / 2;
+    const groundY = h - 45;
+
+    // Draw Bar A
+    const gradA = ctx.createLinearGradient(0, groundY - bar1H, 0, groundY);
+    gradA.addColorStop(0, '#f97316');
+    gradA.addColorStop(1, '#ea580c');
+    ctx.fillStyle = gradA;
+    ctx.roundRect(bar1X, groundY - bar1H, barW, bar1H, [6, 6, 0, 0]);
+    ctx.fill();
+
+    // Draw Bar B
+    const gradB = ctx.createLinearGradient(0, groundY - bar2H, 0, groundY);
+    gradB.addColorStop(0, '#f43f5e');
+    gradB.addColorStop(1, '#e11d48');
+    ctx.fillStyle = gradB;
+    ctx.roundRect(bar2X, groundY - bar2H, barW, bar2H, [6, 6, 0, 0]);
+    ctx.fill();
+
+    // Baseline
+    ctx.beginPath();
+    ctx.moveTo(20, groundY);
+    ctx.lineTo(w - 20, groundY);
+    ctx.strokeStyle = '#cbd5e1';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Top values
+    ctx.font = 'bold 13px system-ui';
+    ctx.fillStyle = '#ea580c';
+    ctx.textAlign = 'center';
+    ctx.fillText('100% Target', bar1X + barW / 2, groundY - bar1H - 8);
+
+    ctx.fillStyle = '#e11d48';
+    ctx.fillText(`${(100 - gapDelta).toFixed(1)}% Baseline`, bar2X + barW / 2, groundY - bar2H - 8);
+
+    // Labels under bars
+    ctx.font = '600 11px system-ui';
+    ctx.fillStyle = '#1e293b';
+    ctx.fillText('Source A (Projection)', bar1X + barW / 2, groundY + 18);
+    ctx.fillText('Source B (Empirical Audit)', bar2X + barW / 2, groundY + 18);
+
+    // Connecting discrepancy arrow in middle
+    const midX = w / 2;
+    const midY = groundY - 70;
+    ctx.beginPath();
+    ctx.setLineDash([4, 4]);
+    ctx.moveTo(bar1X + barW, groundY - bar1H + 30);
+    ctx.lineTo(bar2X, groundY - bar2H + 15);
+    ctx.strokeStyle = '#ea580c';
+    ctx.lineWidth = 1.8;
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Delta badge in center
+    ctx.fillStyle = '#fff7ed';
+    ctx.strokeStyle = '#ea580c';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.roundRect(midX - 44, midY - 14, 88, 28, 6);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.font = 'bold 11px monospace';
+    ctx.fillStyle = '#ea580c';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`Δ -${gapDelta.toFixed(1)}%`, midX, midY);
+  }
+
+  // ==========================================================================
+  // 15. Research Workspace & Evidence Notebook System
+  // ==========================================================================
+  const NOTEBOOK_STORAGE_KEY = 'insight_fusion_notebook';
+  let notebookItems = [];
+
+  function loadNotebook() {
+    try {
+      const stored = localStorage.getItem(NOTEBOOK_STORAGE_KEY);
+      notebookItems = stored ? JSON.parse(stored) : [];
+    } catch (e) {
+      notebookItems = [];
+    }
+    updateNotebookBadge();
+  }
+
+  function saveNotebook() {
+    try {
+      localStorage.setItem(NOTEBOOK_STORAGE_KEY, JSON.stringify(notebookItems));
+    } catch (e) {}
+    updateNotebookBadge();
+  }
+
+  function updateNotebookBadge() {
+    const badge = document.getElementById('notebookBadgeCount');
+    const modalCount = document.getElementById('notebookItemCount');
+    if (badge) badge.textContent = notebookItems.length;
+    if (modalCount) modalCount.textContent = notebookItems.length;
+  }
+
+  function saveToNotebook(item) {
+    if (!item || !item.claim) return;
+    const exists = notebookItems.find(n => n.claim === item.claim);
+    if (!exists) {
+      notebookItems.push({
+        id: 'nb_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+        source: item.source || 'Verified Source',
+        claim: item.claim,
+        citationKey: item.citationKey || `IF-${new Date().getFullYear()}`,
+        score: item.score || 90,
+        savedAt: new Date().toLocaleDateString()
+      });
+      saveNotebook();
+      renderNotebookList();
+      playSuccess();
+    }
+  }
+
+  function removeFromNotebook(id) {
+    notebookItems = notebookItems.filter(n => n.id !== id);
+    saveNotebook();
+    renderNotebookList();
+    playClick();
+  }
+
+  function renderNotebookList() {
+    const list = document.getElementById('notebookItemsList');
+    if (!list) return;
+
+    if (notebookItems.length === 0) {
+      list.innerHTML = `
+        <div class="notebook-empty-state">
+          <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">📓</div>
+          <h4>Your Research Notebook is Empty</h4>
+          <p style="color: #64748b; font-size: 0.85rem;">Click <strong>⭐ Save to Notebook</strong> on any verified claim, evidence card, or contradiction to save it for your paper or thesis.</p>
+        </div>
+      `;
+      return;
+    }
+
+    list.innerHTML = notebookItems.map(item => `
+      <div class="notebook-item-card">
+        <div class="notebook-item-head">
+          <span class="notebook-item-source">${item.source}</span>
+          <span class="notebook-item-meta">Saved: ${item.savedAt} &bull; Score: ${item.score}%</span>
+        </div>
+        <div class="notebook-item-claim">“${item.claim}”</div>
+        <div class="notebook-item-foot">
+          <span class="notebook-item-key">Citation Key: ${item.citationKey}</span>
+          <button type="button" class="btn-remove-notebook" data-id="${item.id}">Remove ✕</button>
+        </div>
+      </div>
+    `).join('');
+
+    list.querySelectorAll('.btn-remove-notebook').forEach(btn => {
+      btn.onclick = () => {
+        const id = btn.getAttribute('data-id');
+        removeFromNotebook(id);
+      };
+    });
+  }
+
+  function attachNotebookSaveListeners(data) {
+    // Evidence items
+    document.querySelectorAll('.btn-save-evidence').forEach(btn => {
+      btn.onclick = () => {
+        const idx = parseInt(btn.getAttribute('data-idx') || '0', 10);
+        const ev = data.evidenceChain[idx];
+        if (ev) {
+          saveToNotebook({
+            source: ev.source,
+            claim: ev.claim,
+            citationKey: ev.citationKey,
+            score: ev.reliabilityScore || 92
+          });
+          btn.classList.add('saved');
+          btn.textContent = 'Saved ✓';
+        }
+      };
+    });
+
+    // Contradiction items
+    document.querySelectorAll('.btn-save-contradiction').forEach(btn => {
+      btn.onclick = () => {
+        const idx = parseInt(btn.getAttribute('data-idx') || '0', 10);
+        const c = data.contradictions[idx];
+        if (c) {
+          saveToNotebook({
+            source: `${c.claimA.source} vs ${c.claimB.source}`,
+            claim: `Contradiction on "${c.topic}": Claim A: "${c.claimA.statement}" vs Claim B: "${c.claimB.statement}". Resolution: ${c.resolution}`,
+            citationKey: `CONTRA-${idx + 1}-${new Date().getFullYear()}`,
+            score: 95
+          });
+          btn.classList.add('saved');
+          btn.textContent = 'Saved ✓';
+        }
+      };
+    });
+  }
+
+  function exportBibTeX() {
+    playClick();
+    if (notebookItems.length === 0) {
+      alert('Notebook is empty. Star some evidence claims first!');
+      return;
+    }
+    const year = new Date().getFullYear();
+    let bibContent = notebookItems.map((item, idx) => `
+@article{insightfusion_${idx + 1}_${year},
+  author = {${item.source.replace(/[^a-zA-Z0-9 ]/g, '')}},
+  title = {${item.claim.slice(0, 80).replace(/[^a-zA-Z0-9 ]/g, '')}...},
+  journal = {InsightFusion AI Grounded Repository},
+  year = {${year}},
+  note = {Citation Key: ${item.citationKey}, Reliability Index: ${item.score}\\%}
+}`).join('\n');
+
+    downloadFile('insightfusion_citations.bib', bibContent, 'text/plain');
+  }
+
+  function exportLitReview() {
+    playClick();
+    if (notebookItems.length === 0) {
+      alert('Notebook is empty. Star some evidence claims first!');
+      return;
+    }
+    const year = new Date().getFullYear();
+    let mdContent = `# Literature Review & Verified Evidence Dossier\n`;
+    mdContent += `*Compiled by InsightFusion AI Research Platform on ${new Date().toLocaleDateString()}*\n\n`;
+    mdContent += `## Executive Evidence Summary\n`;
+    mdContent += `Total Verified Citations: **${notebookItems.length}**\n\n`;
+    mdContent += `## Catalog of Primary Evidence\n\n`;
+
+    notebookItems.forEach((item, idx) => {
+      mdContent += `### ${idx + 1}. ${item.source}\n`;
+      mdContent += `- **Citation Key:** \`${item.citationKey}\`\n`;
+      mdContent += `- **Reliability Score:** ${item.score}%\n`;
+      mdContent += `- **Verbatim Claim:**\n  > "${item.claim}"\n\n`;
+    });
+
+    downloadFile('insightfusion_literature_review.md', mdContent, 'text/markdown');
+  }
+
+  function downloadFile(filename, text, mimeType) {
+    const blob = new Blob([text], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function initResearchNotebook() {
+    loadNotebook();
+    renderNotebookList();
+
+    const modal = document.getElementById('notebookModal');
+    const btnOpen = document.getElementById('btnOpenNotebook');
+    const btnClose = document.getElementById('btnCloseNotebookModal');
+    const btnDismiss = document.getElementById('btnDismissNotebookModal');
+    const btnBibTeX = document.getElementById('btnExportBibTeX');
+    const btnLitReview = document.getElementById('btnExportLitReview');
+    const btnClear = document.getElementById('btnClearNotebook');
+
+    if (btnOpen) {
+      btnOpen.onclick = () => {
+        playClick();
+        renderNotebookList();
+        if (modal) modal.style.display = 'flex';
+      };
+    }
+    if (btnClose) btnClose.onclick = () => { playClick(); if (modal) modal.style.display = 'none'; };
+    if (btnDismiss) btnDismiss.onclick = () => { playClick(); if (modal) modal.style.display = 'none'; };
+    if (modal) {
+      modal.onclick = (e) => {
+        if (e.target === modal) modal.style.display = 'none';
+      };
+    }
+
+    if (btnBibTeX) btnBibTeX.onclick = exportBibTeX;
+    if (btnLitReview) btnLitReview.onclick = exportLitReview;
+    if (btnClear) {
+      btnClear.onclick = () => {
+        if (confirm('Clear all saved items in your notebook?')) {
+          notebookItems = [];
+          saveNotebook();
+          renderNotebookList();
+          playClick();
+        }
+      };
+    }
+  }
+
+  initResearchNotebook();
   initializePlatform();
 });

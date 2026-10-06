@@ -72,6 +72,9 @@
         <button id="btnToggleSound" class="btn btn-outline btn-sm sound-toggle-btn" title="Toggle Futuristic Sound FX">
           <span id="soundIcon">🔊</span> <span id="soundText">Sound ON</span>
         </button>
+        <button id="btnOpenNotebook" class="btn btn-secondary btn-sm" title="View Saved Evidence & Citations Notebook">
+          <span>📓</span> Notebook <span class="badge badge-orange font-mono" id="notebookBadgeCount" style="padding: 1px 5px; font-size: 0.7rem; margin-left: 2px;">0</span>
+        </button>
         <button id="btnOpenChatNav" class="btn btn-outline btn-sm">
           <span>💬</span> Copilot
         </button>
@@ -572,13 +575,67 @@
         </div>
       </section>
 
-      <!-- Section 2: Contradiction & Disagreement Ledger -->
+      <!-- Section 2: Interactive Force-Directed Knowledge Graph Visualizer (GraphRAG) -->
+      <section class="card-panel graphrag-panel" id="knowledgeGraphSection">
+        <div class="panel-header">
+          <div>
+            <div class="mini-tag">GRAPHRAG &amp; ENTITY TOPOLOGY</div>
+            <h2 class="panel-title">2. Interactive Entity &amp; Contradiction Knowledge Graph</h2>
+            <p class="panel-desc">Dynamic force-directed network mapping statutory entities, corroboration edges, and contradiction divergence vectors.</p>
+          </div>
+          <div class="graph-toolbar">
+            <div class="graph-filters-group">
+              <button type="button" class="graph-filter-btn active" data-graph-filter="all">All Nodes</button>
+              <button type="button" class="graph-filter-btn" data-graph-filter="conflicts">⚡ Conflicts Only</button>
+              <button type="button" class="graph-filter-btn" data-graph-filter="sources">🏛️ Sources Only</button>
+            </div>
+            <div class="graph-controls-group">
+              <button type="button" class="btn-icon" id="btnGraphReset" title="Reset View &amp; Center">⟲</button>
+              <button type="button" class="btn-icon" id="btnGraphZoomIn" title="Zoom In">+</button>
+              <button type="button" class="btn-icon" id="btnGraphZoomOut" title="Zoom Out">&minus;</button>
+              <button type="button" class="btn-icon" id="btnGraphTogglePhysics" title="Pause / Resume Physics Simulation">⏸️</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Graph Visual Canvas + Node Inspector Split Layout -->
+        <div class="graph-canvas-wrapper">
+          <canvas id="knowledgeGraphCanvas" class="knowledge-graph-canvas"></canvas>
+          
+          <!-- Floating / Integrated Node Inspector Panel -->
+          <div class="graph-node-inspector" id="graphNodeInspector" style="display: none;">
+            <div class="inspector-head">
+              <span class="badge" id="inspectorNodeBadge">Target Inquiry</span>
+              <button type="button" class="inspector-close" id="btnCloseInspector">&times;</button>
+            </div>
+            <h4 class="inspector-title" id="inspectorNodeTitle">Node Details</h4>
+            <div class="inspector-meta" id="inspectorNodeMeta">Type: Query Root &bull; Score: 92/100</div>
+            <div class="inspector-body" id="inspectorNodeExcerpt">Click on any node in the graph to inspect extracted claims, source credibility, and connected edges.</div>
+            <div class="inspector-actions" id="inspectorNodeActions">
+              <button type="button" class="btn btn-secondary btn-sm" id="btnInspectorSave">⭐ Save to Notebook</button>
+              <button type="button" class="btn btn-outline btn-sm" id="btnInspectorCopy">📋 Copy Text</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="graph-legend-bar">
+          <span class="legend-item"><span class="legend-dot orange"></span> Target Inquiry</span>
+          <span class="legend-item"><span class="legend-dot blue"></span> Statutory Registry</span>
+          <span class="legend-item"><span class="legend-dot green"></span> Academic &amp; Scientific</span>
+          <span class="legend-item"><span class="legend-dot purple"></span> Multilateral Registry</span>
+          <span class="legend-item"><span class="legend-dot teal"></span> Ground-Truth Claim</span>
+          <span class="legend-item"><span class="legend-dot red"></span> Contradiction Vector</span>
+          <span class="legend-tip">💡 Tip: Drag nodes to explore physics &bull; Click node to inspect &bull; Scroll wheel to zoom</span>
+        </div>
+      </section>
+
+      <!-- Section 3: Contradiction & Disagreement Ledger -->
       <section class="card-panel panel-warning" id="contradictionSection">
         <div class="panel-header">
           <div class="title-with-badge">
             <span class="warning-icon">⚡</span>
             <div>
-              <h2 class="panel-title text-warning">2. Contradiction & Disagreement Ledger</h2>
+              <h2 class="panel-title text-warning">3. Contradiction &amp; Disagreement Ledger</h2>
               <p class="panel-desc">Divergent data points preserved with source attribution instead of being masked or averaged.</p>
             </div>
           </div>
@@ -608,7 +665,54 @@
         </div>
       </section>
 
-      <!-- Section 4: Source Reliability Matrix -->
+      <!-- Section 4: Multi-Factor Reliability Radar & Divergence Analytics Suite -->
+      <section class="card-panel analytics-suite-panel" id="analyticsSuiteSection">
+        <div class="panel-header">
+          <div>
+            <div class="mini-tag">QUANTITATIVE AUDIT &amp; RADAR ANALYTICS</div>
+            <h2 class="panel-title">4. Source Reliability Radar &amp; Divergence Calculus</h2>
+            <p class="panel-desc">Multi-dimensional evaluation across Domain Authority, Recency, Consensus, and Empirical Rigor.</p>
+          </div>
+          <span class="badge badge-orange font-mono">Formula: 40% A + 25% R + 25% C + 10% E</span>
+        </div>
+
+        <div class="analytics-charts-grid">
+          <!-- Card 1: 4-Factor Source Reliability Radar -->
+          <div class="analytics-chart-card">
+            <div class="chart-card-header">
+              <span class="chart-card-title">📡 4-Factor Source Reliability Radar</span>
+              <span class="badge badge-subtle">Normalized 0–100 Scale</span>
+            </div>
+            <div class="radar-canvas-container">
+              <canvas id="radarChartCanvas" width="460" height="340"></canvas>
+            </div>
+            <div class="radar-legend-list" id="radarLegendList">
+              <!-- Injected via JS -->
+            </div>
+          </div>
+
+          <!-- Card 2: Contradiction Divergence Gap Calculus -->
+          <div class="analytics-chart-card">
+            <div class="chart-card-header">
+              <span class="chart-card-title">📊 Contradiction Divergence &amp; Variance Gap</span>
+              <span class="badge badge-warning" id="divergenceDeltaBadge">&Delta; Gap: 44.8%</span>
+            </div>
+            <div class="divergence-canvas-container">
+              <canvas id="divergenceChartCanvas" width="460" height="240"></canvas>
+            </div>
+            <div class="divergence-stat-summary" id="divergenceStatSummary">
+              <div class="math-callout font-mono" style="margin-top: 0.5rem; font-size: 0.82rem;">
+                &Delta;<sub>divergence</sub> = (|Claim<sub>A</sub> &minus; Claim<sub>B</sub>| / max(Claim<sub>A</sub>, Claim<sub>B</sub>)) &times; 100%
+              </div>
+              <p class="divergence-text-note" id="divergenceTextNote">
+                Methodological variance indicates qualitative transition rather than pure total displacement.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 5: Source Reliability Matrix -->
       <section class="card-panel">
         <div class="panel-header">
           <div>
@@ -1061,6 +1165,50 @@
       </div>
       <div class="modal-foot">
         <button class="btn btn-secondary" id="btnDismissLensModal">Close Lens</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 📓 Research Workspace & Evidence Notebook Modal Drawer -->
+  <div class="modal-backdrop" id="notebookModal" style="display: none;">
+    <div class="modal-card modal-lg">
+      <div class="modal-head">
+        <div>
+          <span class="badge badge-orange">Researcher Workspace</span>
+          <h2 class="modal-heading">📓 Saved Evidence &amp; Literature Review Notebook</h2>
+          <p class="modal-sub">Bookmarked claims, primary quotations, and automated BibTeX / LaTeX citation export.</p>
+        </div>
+        <button class="modal-close" id="btnCloseNotebookModal">&times;</button>
+      </div>
+      <div class="modal-content">
+        <div class="notebook-actions-bar">
+          <div class="notebook-stats">
+            <strong id="notebookItemCount">0</strong> Saved Evidence Items
+          </div>
+          <div class="notebook-btns">
+            <button type="button" class="btn btn-secondary btn-sm" id="btnExportBibTeX">
+              <span>📋</span> Export BibTeX (.bib)
+            </button>
+            <button type="button" class="btn btn-secondary btn-sm" id="btnExportLitReview">
+              <span>📥</span> Export Literature Review (.md)
+            </button>
+            <button type="button" class="btn btn-outline btn-sm text-danger" id="btnClearNotebook">
+              <span>🗑️</span> Clear All
+            </button>
+          </div>
+        </div>
+
+        <!-- Notebook Items List -->
+        <div class="notebook-items-list" id="notebookItemsList">
+          <div class="notebook-empty-state">
+            <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">📓</div>
+            <h4>Your Research Notebook is Empty</h4>
+            <p style="color: #64748b; font-size: 0.85rem;">Click <strong>⭐ Save to Notebook</strong> on any verified claim, evidence card, or contradiction to save it for your paper or thesis.</p>
+          </div>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-secondary" id="btnDismissNotebookModal">Close Notebook</button>
       </div>
     </div>
   </div>
