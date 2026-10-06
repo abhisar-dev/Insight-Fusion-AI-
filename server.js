@@ -174,10 +174,14 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-app.listen(PORT, () => {
-  console.log(`================================================================`);
-  console.log(`🚀 INSIGHTFUSION AI — RESEARCH & VERIFICATION PLATFORM`);
-  console.log(`💬 Student AI Research Copilot & Fact-Checker Active`);
-  console.log(`🌐 Live on: http://localhost:${PORT}`);
-  console.log(`================================================================`);
-});
+export default app;
+
+if (process.env.NETLIFY !== 'true' && !process.env.LAMBDA_TASK_ROOT) {
+  app.listen(PORT, () => {
+    console.log(`================================================================`);
+    console.log(`🚀 INSIGHTFUSION AI — RESEARCH & VERIFICATION PLATFORM`);
+    console.log(`💬 Student AI Research Copilot & Fact-Checker Active`);
+    console.log(`🌐 Live on: http://localhost:${PORT}`);
+    console.log(`================================================================`);
+  });
+}
